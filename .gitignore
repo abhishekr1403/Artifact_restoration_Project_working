@@ -1,0 +1,20 @@
+# data & weights are never committed (see scripts/download_dataset.py)
+data/
+raw/
+*.zip
+*.ckpt
+*.pth
+*.safetensors
+checkpoints/
+results/
+reports/
+# keep small curated samples used by the README / web app
+!assets/samples/**
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+.env
+*.token
+node_modules/
+.DS_Store

@@ -1,0 +1,38 @@
+# Central configuration. Every notebook/script reads this file, so a single
+# edit changes the whole pipeline. Paths are relative to the workspace roots
+# resolved in src/heritage/paths.py.
+
+project:
+  name: artefact-restoration-3d
+  seed: 42                      # fixed everywhere (SD generators, numpy, torch)
+
+dataset:
+  figshare_article: 24637428
+  figshare_file_id: 43296708    # 3D.zip
+  expected_zip_bytes: 699643675
+  license: "CC BY 4.0"
+  citation: "Stoean et al. (2024), Journal of Cultural Heritage 69:18-26, doi:10.1016/j.culher.2024.07.008"
+
+workspace:
+  # Persistent (Google Drive) - results survive session resets.
+  drive_dir: "/content/drive/MyDrive/artefact-restoration-3d"
+  # Fast local scratch (wiped when the Colab VM recycles).
+  local_dir: "/content/work"
+
+inpainting:
+  resolution: 512               # SD works at 512; outputs are resized back to frame size
+  sd_runs: 10                   # paper protocol
+  sd_steps: 25                  # T4-friendly; paper default is higher
+  sd_guidance: 7.5
+  lama_checkpoint: "smartywu/big-lama"
+
+reconstruction:
+  gaussian_iterations: 30000
+  train_resolution_scale: 2     # -r 2 keeps 3DGS inside 16 GB VRAM on a free T4
+  holdout_every: 8              # every 8th registered view is held out for testing
+
+colab:
+  # The DGX needed numpy<2 because torch 2.1.2 was compiled against NumPy 1.x.
+  # Colab ships a newer torch built for NumPy 2, so we do NOT pin blindly: the
+  # notebooks run a functional numpy<->torch smoke test and pin only if it fails.
+  numpy_pin_if_smoke_test_fails: "<2"

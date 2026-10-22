@@ -1,0 +1,11 @@
+# Light core used by every notebook (the heavy, stage-specific libraries are
+# installed by the notebook that needs them, to avoid dependency clashes on Colab).
+numpy
+pillow
+pyyaml
+requests
+pandas
+matplotlib
+tqdm
+scipy
+opencv-python-headless
