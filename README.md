@@ -27,6 +27,7 @@ flowchart LR
 | Stage | What | Status |
 |---|---|---|
 | 0 | Repo skeleton, Colab setup, dataset download + inventory | ✅ code ready (run on Colab to confirm dataset layout) |
+| 0b | Ground-truth set: 29 undamaged frames (Images minus masks) + the paper's 4 test-mask types | ✅ code ready, tested on mock data (run notebook 02 on Colab, then check the contact sheet) |
 | 1 | LaMa inpainting | ⬜ |
 | 2 | Stable Diffusion inpainting ×10 (resumable) | ⬜ |
 | 3 | Automatic candidate selection (CLIP-IQA / MUSIQ / TOPIQ + multi-view consistency) | ⬜ |
@@ -50,12 +51,16 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
+## Dataset facts (verified from the real archive)
+
+The archive ships only `Images/` (334 frames, 1920×1080) and `masks/` (305 annotated masks). There is no ground-truth folder: the paper's **29 ground-truth frames are the frames with no mask** (damage not visible), so `scripts/prepare_gt.py` derives them as `Images` minus `masks`, then builds the paper's four test masks (rectangle, marginal, large-marginal, multiple) on the vase with a fixed seed.
+
 ## Repository layout
 
 ```
 configs/default.yaml     all settings in one place (seed, SD runs, 3DGS iterations, paths)
-src/heritage/            shared code: paths, frame-ID matching, Colab helpers, dataset inventory
-scripts/                 command-line tools (dataset download with resume + size check)
+src/heritage/            shared code: paths, frame-ID matching, Colab helpers, inventory, GT split, mask generator
+scripts/                 command-line tools (dataset download, ground-truth + test-mask builder)
 notebooks/               one notebook per stage, designed for free Colab
 tests/                   unit tests (frame matching, inventory, download resume)
 web/                     portfolio web app (later stage)

@@ -10,6 +10,11 @@ dataset:
   figshare_article: 24637428
   figshare_file_id: 43296708    # 3D.zip
   expected_zip_bytes: 699643675
+  # Layout verified from the real archive (inventory): only Images/ and masks/ ship.
+  images_subdir: "3D/Images"    # 334 frames, 1920x1080
+  masks_subdir: "3D/masks"      # 305 annotated masks, named frame_XXXXX_mask.png
+  expected_gt_frames: 29        # frames with NO mask = undamaged = ground truth (paper, Sec. 5.2)
+  expected_damaged_frames: 305
   license: "CC BY 4.0"
   citation: "Stoean et al. (2024), Journal of Cultural Heritage 69:18-26, doi:10.1016/j.culher.2024.07.008"
 
