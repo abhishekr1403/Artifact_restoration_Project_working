@@ -11,7 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from heritage.gt import contiguous_runs, extract_gt, split_frames  # noqa: E402
-from heritage.synth_masks import MASK_TYPES, make_masks, overlay, to_bool_mask, vase_mask_grabcut  # noqa: E402
+from heritage.synth_masks import (  # noqa: E402
+    MASK_TYPES, choose_mask, crop_box, make_masks, overlay, to_bool_mask, vase_mask_grabcut, vase_mask_sam,
+)
 
 H, W = 108, 192
 
@@ -76,13 +78,72 @@ def test_mask_polarity_is_detected():
     assert (to_bool_mask(np.dstack([vase] * 3)) == (vase > 0)).all()
 
 
-def test_grabcut_finds_the_vase_with_and_without_prior():
+def test_grabcut_finds_the_vase_inside_the_box():
     img, vase = vase_img()
+    got = vase_mask_grabcut(img, box_rel=(0.25, 0.0, 0.75, 1.0))
     v = vase > 0
-    iou = lambda a, b: (a & b).sum() / (a | b).sum()  # noqa: E731
-    assert iou(vase_mask_grabcut(img), v) > 0.85
-    _, shifted = vase_img(shift=3)                       # neighbouring frame's mask as prior
-    assert iou(vase_mask_grabcut(img, prior=shifted > 0), v) > 0.85
+    assert (got & v).sum() / (got | v).sum() > 0.85
+
+
+class FakePredictor:
+    """Stands in for segment_anything.SamPredictor: returns a part, the pot, and the whole room."""
+
+    def __init__(self, vase):
+        self.vase, self.calls = vase, []
+
+    def set_image(self, img):
+        self.shape = img.shape[:2]
+
+    def predict(self, point_coords, point_labels, box, multimask_output):
+        self.calls.append((point_coords, point_labels, box, multimask_output))
+        part = np.zeros(self.shape, bool)
+        part[40:50, 90:100] = True
+        room = np.ones(self.shape, bool)
+        return np.stack([part, self.vase, room]), np.array([0.7, 0.9, 0.95]), None
+
+
+def test_sam_path_uses_box_and_point_and_picks_the_pot_not_the_room():
+    img, vase = vase_img()
+    pred = FakePredictor(vase > 0)
+    got = vase_mask_sam(img, pred, box_rel=(0.25, 0.0, 0.75, 1.0))
+    v = vase > 0
+    assert (got & v).sum() / (got | v).sum() > 0.95            # the room (score .95) was rejected
+    pt, lab, box, multi = pred.calls[0]
+    assert multi is True and lab.tolist() == [1] and box.shape == (4,)
+    assert np.allclose(box, [0.25 * W, 0, 0.75 * W, H]) and np.allclose(pt, [[W / 2, H / 2]])
+
+
+def test_choose_mask_rejects_side_touching_and_falls_back():
+    a = np.zeros((2, 50, 80), bool)
+    a[0, :, :] = True                                           # whole frame
+    a[1, 10:40, 0:20] = True                                    # plausible size but touches left border
+    assert choose_mask(a, np.array([0.9, 0.8])).shape == (50, 80)   # fallback = best score, no crash
+    b = np.zeros((2, 50, 80), bool)
+    b[0, 10:40, 30:50] = True
+    b[1, :, :] = True
+    assert choose_mask(b, np.array([0.5, 0.99]))[20, 40] and not choose_mask(b, np.array([0.5, 0.99]))[0, 0]
+
+
+def test_crop_box_is_padded_and_clipped():
+    m = np.zeros((100, 200), bool)
+    m[30:70, 80:120] = True
+    x0, y0, x1, y1 = crop_box(m, pad=0.1)
+    assert x0 < 80 and x1 > 120 and 0 <= y0 <= 30 and 70 <= y1 <= 100
+    assert crop_box(np.zeros((10, 10), bool)) == (0, 0, 10, 10)
+
+
+def test_stale_masks_are_discarded_when_settings_change(tmp_path):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import prepare_gt as pg
+
+    out = tmp_path / "gt"
+    (out / "masks" / "rectangle").mkdir(parents=True)
+    (out / "masks" / "rectangle" / "frame_00084.png").write_bytes(b"old")
+    assert pg.sync_stamp(out, {"version": 1}) is False          # first stamp: nothing was stale
+    (out / "masks" / "rectangle").mkdir(parents=True, exist_ok=True)
+    (out / "masks" / "rectangle" / "frame_00084.png").write_bytes(b"x")
+    assert pg.sync_stamp(out, {"version": 1}) is False and (out / "masks").exists()   # same stamp: kept
+    assert pg.sync_stamp(out, {"version": 2}) is True and not (out / "masks").exists()  # changed: rebuilt
 
 
 def test_make_masks_types_geometry_and_determinism():
@@ -123,14 +184,14 @@ def test_prepare_gt_script_end_to_end(tmp_path):
     env = {"HERITAGE_DRIVE": str(tmp_path / "drive"), "HERITAGE_LOCAL": str(tmp_path / "local"),
            "PATH": "/usr/bin:/bin:/usr/local/bin"}
     cmd = [sys.executable, str(ROOT / "scripts/prepare_gt.py"), "--images", str(tmp_path / "d/Images"),
-           "--masks", str(tmp_path / "d/masks")]
+           "--masks", str(tmp_path / "d/masks"), "--method", "grabcut", "--box", "0.25", "0.0", "0.75", "1.0"]
     r = subprocess.run(cmd, env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-800:]
     out = tmp_path / "drive/results/gt"
     assert len(list((out / "images").glob("*.png"))) == 29
     for t in MASK_TYPES:
         assert len(list((out / "masks" / t).glob("*.png"))) == 29
-    assert (out / "previews/gt_masks_contact_sheet.jpg").exists()
+    assert (out / "previews/gt_masks_sheet_1.jpg").exists()
     rep = json.loads((out / "mask_report.json").read_text())
     assert len(rep) == 29 and all(0.02 < x["vase_frac_of_image"] < 0.9 for x in rep)
     before = (out / "masks/multiple/frame_00090.png").read_bytes()

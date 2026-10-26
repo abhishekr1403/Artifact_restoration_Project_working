@@ -27,7 +27,7 @@ flowchart LR
 | Stage | What | Status |
 |---|---|---|
 | 0 | Repo skeleton, Colab setup, dataset download + inventory | ✅ code ready (run on Colab to confirm dataset layout) |
-| 0b | Ground-truth set: 29 undamaged frames (Images minus masks) + the paper's 4 test-mask types | ✅ code ready, tested on mock data (run notebook 02 on Colab, then check the contact sheet) |
+| 0b | Ground-truth set: 29 undamaged frames (Images minus masks), pot located with Segment Anything, the paper's 4 test-mask types | ✅ code ready, tested on mock data (run notebook 02 on Colab and check the preview sheets) |
 | 1 | LaMa inpainting | ⬜ |
 | 2 | Stable Diffusion inpainting ×10 (resumable) | ⬜ |
 | 3 | Automatic candidate selection (CLIP-IQA / MUSIQ / TOPIQ + multi-view consistency) | ⬜ |
@@ -53,7 +53,7 @@ python -m pytest -q
 
 ## Dataset facts (verified from the real archive)
 
-The archive ships only `Images/` (334 frames, 1920×1080) and `masks/` (305 annotated masks). There is no ground-truth folder: the paper's **29 ground-truth frames are the frames with no mask** (damage not visible), so `scripts/prepare_gt.py` derives them as `Images` minus `masks`, then builds the paper's four test masks (rectangle, marginal, large-marginal, multiple) on the vase with a fixed seed.
+The archive ships only `Images/` (334 frames, 1920×1080) and `masks/` (305 annotated masks). There is no ground-truth folder: the paper's **29 ground-truth frames are the frames with no mask** (damage not visible), so `scripts/prepare_gt.py` derives them as `Images` minus `masks`, locates the pot with Segment Anything, then builds the paper's four test masks (rectangle, marginal, large-marginal, multiple) on it with a fixed seed. Note: the 305 shipped masks mark only the missing rim part, not the whole pot.
 
 ## Repository layout
 

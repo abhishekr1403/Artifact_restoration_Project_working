@@ -24,6 +24,11 @@ workspace:
   # Fast local scratch (wiped when the Colab VM recycles).
   local_dir: "/content/work"
 
+segmentation:
+  sam_model: vit_b              # light model for locating the pot; ViT-H is used later for damage masks
+  vase_box: [0.28, 0.02, 0.92, 0.66]   # relative x0,y0,x1,y1 containing the pot in GT frames
+  gt_mask_version: 2            # bump to force regeneration of stored GT masks
+
 inpainting:
   resolution: 512               # SD works at 512; outputs are resized back to frame size
   sd_runs: 10                   # paper protocol
